@@ -5,15 +5,24 @@
 #   mise run                # build + push  (default task, = `mise run push`)
 #   mise run build          # build only (latest + git sha tags)
 #   mise run push           # build + push to Docker Hub
+#
+# Always builds for linux/amd64 (the QNAP), because the build host is a
+# Mac and the Docker Hub tags must be runnable on x86_64 no matter where
+# `mise` ran. Override with TARGET_PLATFORM=linux/arm64 if you ever
+# build for an arm box.
 
 # ============================================================ build
 [tasks.build]
-description = "Build tammert/defibrillator, tagged latest + git sha"
+description = "Build tammert/defibrillator for linux/amd64 (the QNAP), tagged latest + git sha"
 run = """
 set -euo pipefail
+# The target is the x86_64 QNAP no matter where the build machine is:
+# without --platform, Docker builds for the builder's native arch
+# (an Apple-Silicon Mac produces arm64, which the QNAP cannot run).
 sha=$(git rev-parse --short HEAD)
-echo "building tammert/defibrillator:latest and :$sha"
-docker build -t tammert/defibrillator:latest -t tammert/defibrillator:$sha .
+echo "building tammert/defibrillator:${TARGET_PLATFORM:-linux/amd64}:latest and :$sha"
+docker build --platform ${TARGET_PLATFORM:-linux/amd64} \
+  -t tammert/defibrillator:latest -t tammert/defibrillator:$sha .
 echo "built $(docker images tammert/defibrillator:latest --format '{{.ID}}' | cut -c1-12)"
 """
 
@@ -29,7 +38,8 @@ grep -q index.docker.io "$cfg" 2>/dev/null || {
   exit 1
 }
 sha=$(git rev-parse --short HEAD)
-docker build -t tammert/defibrillator:latest -t tammert/defibrillator:$sha .
+docker build --platform ${TARGET_PLATFORM:-linux/amd64} \
+  -t tammert/defibrillator:latest -t tammert/defibrillator:$sha .
 docker push tammert/defibrillator:latest
 docker push tammert/defibrillator:$sha
 echo "pushed tammert/defibrillator:latest and :$sha"
