@@ -220,8 +220,17 @@ func (p *proxy) runRound(r *wakeRound) {
 	}
 }
 
+// touch records a new last-request time and announces when the next
+// poweroff attempt happens if nothing else arrives: now + IDLE_TIMEOUT.
+func (p *proxy) touch(now time.Time, what string) {
+	p.lastReq.Store(now.UnixNano())
+	log.Printf("idle counter reset (%s) - next poweroff attempt at %s",
+		what, now.Add(p.cfg.idleTimeout).Format("2006-01-02 15:04:05 MST"))
+}
+
 func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	p.lastReq.Store(time.Now().UnixNano())
+	now := time.Now()
+	p.touch(now, fmt.Sprintf("%s %s", r.Method, r.URL.Path))
 	p.servedOnce.Store(true)
 	if err := p.ensureAwake(r.Context()); err != nil {
 		log.Printf("%s %s: %v", r.Method, r.URL.Path, err)
@@ -283,7 +292,7 @@ func (p *proxy) idleLoop(ctx context.Context) {
 		if !reachable(p.cfg.backend) {
 			log.Printf("idle %s but backend already down - nothing to do",
 				idled.Round(time.Second))
-			p.lastReq.Store(time.Now().UnixNano())
+			p.touch(time.Now(), "backend already down")
 			continue
 		}
 		log.Printf("idle %s - requesting poweroff of %s",
@@ -295,7 +304,7 @@ func (p *proxy) idleLoop(ctx context.Context) {
 		}
 		// Box is shutting down; restart the clock so we don't retry
 		// against a half-dead box for the next IDLE_TIMEOUT.
-		p.lastReq.Store(time.Now().UnixNano())
+		p.touch(time.Now(), "poweroff requested")
 	}
 }
 
