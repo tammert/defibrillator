@@ -1,0 +1,72 @@
+# defibrillator (WoL proxy + idle poweroff) + hermes-agent gateway, on the QNAP TS-464.
+#
+#   docker compose pull   # first time / after a new defibrillator push
+#   docker compose up -d
+#   docker compose logs -f defibrillator
+#
+# Networking: both use the host network.
+#   - defibrillator sends raw UDP WOL packets and dials the 5090's LAN IP
+#   - hermes's Ollama model goes THROUGH the proxy (:8080) so every request
+#     counts toward the idle timer that powers the box off
+#
+# Required in .env next to this file (or exported in the shell):
+#   WOL_MAC          NIC MAC of the 5090          (ip link on the 5090)
+#   HERMES_API_KEY   32+ chars                     (openssl rand -hex 32)
+# Optional (sane defaults below): OLLAMA_LAN_IP, SSH_TARGET
+#
+# One-time box-side setup: the 5090 must accept the SSH key that the
+# ./ssh/id_ed25519 private key (mounted read-only) corresponds to, in its
+# authorized_keys — the proxy calls `ssh <SSH_TARGET> 'systemctl poweroff'`.
+
+name: hermes
+
+services:
+  defibrillator:
+    image: tammert/defibrillator:latest   # pin a git-sha tag for production
+    container_name: defibrillator
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      LISTEN: ":8080"
+      BACKEND: "${OLLAMA_LAN_IP:-192.168.1.90}:11434"   # 5090 Ollama
+      WOL_MAC: "${WOL_MAC:?WOL_MAC required, e.g. AA:BB:CC:DD:EE:FF}"
+      WOL_BROADCAST: "255.255.255.255:9"
+      WAKE_TIMEOUT: "5m"     # max total wait for one shared wake round
+      IDLE_TIMEOUT: "30m"    # silence before requesting poweroff
+      SSH_TARGET: "${SSH_TARGET:-tammert@192.168.1.90}"  # empty = wake-only, no poweroff
+    volumes:
+      # Ed25519 private key the 5090 authorizes; dir 700, key 600, root-owned
+      ./ssh:/root/.ssh:ro
+
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      # Existing data dir (config, .env, sessions, skills, memories).
+      # Owned by the NAS account that runs the gateway.
+      - ~/.hermes:/opt/data
+    # PUID/PGID: match the NAS owner of ~/.hermes (id 1000 on gododdin).
+    environment:
+      PUID: "1000"
+      PGID: "100"
+      # OpenAI-compatible API server on :8642 (dashboard / external clients).
+      # The chat model itself is set inside ~/.hermes/config.yaml:
+      #   model:
+      #     provider: openai
+      #     model: qwen3.8:27b
+      #     base_url: http://127.0.0.1:8080/v1   # through the WoL proxy
+      #   provider: openai
+      #   openai.key_env: DUMMY                   # any non-empty value works
+      API_SERVER_ENABLED: "true"
+      API_SERVER_HOST: "0.0.0.0"
+      API_SERVER_KEY: "${HERMES_API_KEY:?set HERMES_API_KEY = $(openssl rand -hex 32) in .env}"
+      API_SERVER_CORS_ORIGINS: "*"
+      # Dashboard (optional; :9119). Non-loopback binds REQUIRE an auth
+      # provider — with nothing set it fails closed at startup.
+      # HERMES_DASHBOARD: "1"
+      # HERMES_DASHBOARD_BASIC_AUTH_USERNAME: "tammert"
+      # HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: "..."
+    shm_size: "1g"         # browser tools
+    command: ["gateway", "run"]

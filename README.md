@@ -28,7 +28,8 @@ go build -o defibrillator .
 WOL_MAC=aa:bb:cc:dd:ee:ff ./defibrillator          # WOL_MAC is required
 ```
 
-Or Docker (multi-stage, `scratch` runtime, ~2 MB, non-root):
+Or Docker (multi-stage; Alpine base carries the `ssh` client the idle
+poweroff shells out to — a bare `scratch` image cannot do SSH at all):
 
 ```sh
 docker build -t tammert/defibrillator .
@@ -37,11 +38,28 @@ docker run --rm -it \
   -e WOL_MAC=aa:bb:cc:dd:ee:ff \
   -e BACKEND=192.168.1.50:11434 \
   -e SSH_TARGET=tammert@192.168.1.50 \
+  -v ~/.ssh/defibrillator:/root/.ssh:ro \
   tammert/defibrillator
 ```
 
 `--network host` is required: the proxy needs to emit unicast
-WOL (UDP `:9`) and reach the LAN directly.
+WOL (UDP `:9`) and reach the LAN directly. For idle poweroff the ssh
+key lives in a read-only mount on `/root/.ssh` (dir `700`, key `600`).
+
+## Deploying next to hermes-agent
+
+`docker-compose.yml` + `.env.example` run the full loop on one small
+box (e.g. a NAS): the gateway, its always-on small model, and this
+proxy for the big model on the sleep-and-wake GPU box. Hermes points
+its OpenAI-compatible provider at `http://127.0.0.1:8080/v1`, so every
+turn goes through the proxy and the idle clock counts real usage:
+
+```sh
+cp .env.example .env   # fill WOL_MAC, HERMES_API_KEY (+ SSH_TARGET)
+mkdir -p ssh && cp your_ed25519_key ssh/id_ed25519 && chmod 600 ssh/id_ed25519
+chmod 700 ssh && chown -R root:root ssh   # the 5090 must accept this key
+docker compose up -d
+```
 
 ## Configuration
 
