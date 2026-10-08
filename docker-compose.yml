@@ -23,8 +23,12 @@
 #   OLLAMA_LAN_IP   5090 LAN IP               (default 192.168.1.90)
 #   SSH_TARGET      user@ip for poweroff      (default tammert@192.168.1.90)
 #
-# Box-side setup: the 5090 must accept the ./ssh/id_ed25519 key in its
-# authorized_keys; the proxy runs `ssh <SSH_TARGET> 'systemctl poweroff'`.
+# One-time box-side setup: the 5090 must accept the ./ssh/id_ed25519 key in the
+# defibrillator user's authorized_keys, and a sudoers line must let that user
+# run poweroff without a password (no polkit on that Debian box):
+#   defibrillator ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff
+# The proxy then runs:  ssh defibrillator@192.168.1.90 'sudo systemctl poweroff'
+# (POWEROFF_CMD env, defaulted to plain 'systemctl poweroff' for polkit boxes).
 
 name: hermes
 
@@ -43,6 +47,8 @@ services:
       WAKE_TIMEOUT: "5m"     # max total wait for one shared wake round
       IDLE_TIMEOUT: "30m"    # silence before requesting poweroff
       SSH_TARGET: "${SSH_TARGET:-tammert@192.168.1.90}"  # empty = wake-only, no poweroff
+      # Box has no polkit, but a sudoers line authorizes this for the defibrillator user:
+      POWEROFF_CMD: "sudo systemctl poweroff"
     volumes:
       # Ed25519 private key the 5090 authorizes. Dir 700, key 600, root-owned.
       ./ssh:/root/.ssh:ro

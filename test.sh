@@ -242,6 +242,21 @@ echo "  ssh.log lines after 25s with zero traffic: $lines"
 stop_proxy
 unset SSH_TARGET
 
+# ============================================================ H
+echo "=== H: POWEROFF_CMD override -> ssh receives the custom remote command ==="
+: > ssh.log
+fake_ollama || { echo fake-ollama failed; exit 1; }
+export SSH_TARGET=tammert@10.0.0.50
+export POWEROFF_CMD="sudo systemctl poweroff"
+start_proxy 20s 8s || { echo proxy failed; exit 1; }
+curl --max-time 5 -s http://127.0.0.1:$P/api/ps > /dev/null   # warm: box was used
+for _ in $(seq 1 40); do [ -s ssh.log ] && break; sleep 1; done
+echo "  ssh.log: $(cat ssh.log)"
+[ "$(cat ssh.log)" = "-o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new tammert@10.0.0.50 sudo systemctl poweroff" ] \
+  && ok "ssh received POWEROFF_CMD verbatim" || bad "ssh.log: $(cat ssh.log)"
+stop_proxy; stop_fake
+unset SSH_TARGET POWEROFF_CMD
+
 echo
 echo "RESULT: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

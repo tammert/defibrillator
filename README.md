@@ -74,6 +74,7 @@ All via environment variables. Defaults in parentheses.
 | `WAKE_TIMEOUT`  | `5m`                | how long to wait for the box to come up per request          |
 | `IDLE_TIMEOUT`  | `30m`               | silence before the proxy asks the box to power off           |
 | `SSH_TARGET`    | *(unset)*           | `user@box`; empty/absent disables idle shutdown entirely     |
+| `POWEROFF_CMD`  | `systemctl poweroff` | remote command executed over ssh; use `sudo systemctl poweroff` on boxes without polkit |
 
 `WAKE_TIMEOUT` applies per wake round, per request that joined it — a
 client never waits longer than that.

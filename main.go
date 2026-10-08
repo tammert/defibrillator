@@ -39,6 +39,7 @@ type config struct {
 	wakeTimeout time.Duration
 	idleTimeout time.Duration
 	sshTarget   string // e.g. "tammert@192.168.1.50"; empty disables shutdown
+	poweroffCmd string // remote command, default "systemctl poweroff"
 }
 
 type proxy struct {
@@ -106,6 +107,7 @@ func newConfig() (config, error) {
 		wakeTimeout: envDuration("WAKE_TIMEOUT", 5*time.Minute),
 		idleTimeout: envDuration("IDLE_TIMEOUT", 30*time.Minute),
 		sshTarget:   envOr("SSH_TARGET", ""),
+		poweroffCmd: envOr("POWEROFF_CMD", "systemctl poweroff"),
 	}
 	raw := strings.TrimSpace(os.Getenv("WOL_MAC"))
 	if raw == "" {
@@ -242,7 +244,7 @@ func (p *proxy) poweroff(ctx context.Context) error {
 		"-o", "ConnectTimeout=5",
 		"-o", "StrictHostKeyChecking=accept-new",
 		p.cfg.sshTarget,
-		"systemctl poweroff",
+		p.cfg.poweroffCmd,
 	).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
