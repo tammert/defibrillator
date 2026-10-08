@@ -269,8 +269,11 @@ func (p *proxy) idleLoop(ctx context.Context) {
 		log.Printf("idle shutdown disabled (no SSH_TARGET)")
 		return
 	}
-	log.Printf("idle shutdown: no traffic for %s -> ssh %s",
-		p.cfg.idleTimeout, p.cfg.sshTarget)
+	// First possible poweroff is after the first served request plus
+	// IDLE_TIMEOUT; the earliest that can land is now + IDLE_TIMEOUT.
+	log.Printf("idle shutdown: no traffic for %s -> ssh %s (earliest poweroff attempt %s)",
+		p.cfg.idleTimeout, p.cfg.sshTarget,
+		time.Now().Add(p.cfg.idleTimeout).Format("2006-01-02 15:04:05 MST"))
 
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
