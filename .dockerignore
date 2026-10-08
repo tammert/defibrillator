@@ -1,20 +1,43 @@
-# build context = repo root
-.dockerignore:
-*
+# .dockerignore for defibrillator
+# build needs: Dockerfile, go.mod, main.go — everything else is noise.
+# (Docker's ignore has no allowlist "block", so we enumerate what to drop.)
 
-# runtime
-bin/
-defibrillator
-proxy.log
-ssh.log
-sniff.txt
-sniff.py
-D.codes
-*.pid
-
-# docs / tools not needed in the image
-README.md
+# tests + docs + license
 test.sh
+README.md
+LICENSE
 docker-compose.yml
+
+# git + editors
 .git/
 .gitignore
+.idea/
+.vscode/
+.env
+
+# build/test scratch
+bin/
+defibrillator
+*.log
+*.txt
+*.pid
+*.codes
+*.exe
+*.test
+*.out
+*.coverprofile
+vendor/
+go.work
+go.work.sum
+proxy.log
+plog.txt
+ssh.log
+run.log
+sniff.txt
+sniff.log
+body.txt
+hdr.txt
+D.codes
+proxy.pid
+fake.pid
+sniff.pid
