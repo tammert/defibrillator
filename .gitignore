@@ -31,3 +31,19 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# defibrillator build + test scratch
+defibrillator
+proxy.log
+plog.txt
+ssh.log
+run.log
+sniff.txt
+sniff.log
+body.txt
+hdr.txt
+D.codes
+proxy.pid
+fake.pid
+sniff.pid
+bin/
