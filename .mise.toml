@@ -1,0 +1,41 @@
+# defibrillator — mise tasks
+#
+#   mise trust .            # once per clone (taskfile trust)
+#   docker login tammert    # once, for Docker Hub push
+#   mise run                # build + push  (default task, = `mise run push`)
+#   mise run build          # build only (latest + git sha tags)
+#   mise run push           # build + push to Docker Hub
+
+# ============================================================ build
+[tasks.build]
+description = "Build tammert/defibrillator, tagged latest + git sha"
+run = """
+set -euo pipefail
+sha=$(git rev-parse --short HEAD)
+echo "building tammert/defibrillator:latest and :$sha"
+docker build -t tammert/defibrillator:latest -t tammert/defibrillator:$sha .
+echo "built $(docker images tammert/defibrillator:latest --format '{{.ID}}' | cut -c1-12)"
+"""
+
+# ============================================================ push
+[tasks.push]
+description = "Build and push tammert/defibrillator to Docker Hub"
+run = """
+set -euo pipefail
+cfg=$HOME/.docker/config.json
+grep -q index.docker.io "$cfg" 2>/dev/null || {
+  echo "not logged in to Docker Hub"
+  echo "run: docker login tammert"
+  exit 1
+}
+sha=$(git rev-parse --short HEAD)
+docker build -t tammert/defibrillator:latest -t tammert/defibrillator:$sha .
+docker push tammert/defibrillator:latest
+docker push tammert/defibrillator:$sha
+echo "pushed tammert/defibrillator:latest and :$sha"
+"""
+
+# ============================================================ default
+[tasks.default]
+description = "build + push to Docker Hub (same as `mise run push`)"
+depends = ["push"]
